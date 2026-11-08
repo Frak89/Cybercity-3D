@@ -392,7 +392,7 @@ function stepCar(c, inp, dt, city) {
   const slip = Math.abs(c.vx * nrx + c.vz * nrz);
   if (slip > 4 && sp > 12) { c.drift += slip * dt * 10; } else if (c.drift > 0) { c.score += Math.round(c.drift); c.best = Math.max(c.best, Math.round(c.drift)); c.drift = 0; }
   if (c.world === 'track') { if (c.trackCollide) c.trackCollide(c); }
-  else { if (c.world === 'meadow') { if ((c.y || 0) < 1.0) collideMeadow(c, c.meadow); } else collide(c, city);
+  else { if (c.world === 'meadow') { if ((c.y || 0) < 1.0 && !c.era) collideMeadow(c, c.meadow); } else collide(c, city);
     c.x = ((c.x % S) + S) % S; c.z = ((c.z % S) + S) % S; }
   c.shake = Math.max(0, c.shake - dt * 3); c.hit = Math.max(0, c.hit - dt * 2.5);
   // wheelspin on a hard launch (and with the handbrake held while on the gas: burnout on the spot)
@@ -557,7 +557,8 @@ function Game(canvas, hud, opts) {
   this.net = window.KageNet && this.foot ? new KageNet(this) : null;   // KAGE NET local multiplayer (web/net.js)
   this.photo = window.KagePhoto && this.foot ? new KagePhoto(this) : null;   // AmpyCam photo mode (web/photo.js)
   this.editor = window.KageEditor && this.foot ? new KageEditor(this) : null;   // KAGE BUILD city decorations (web/editor.js)
-  this.story = window.KageStory && this.foot ? new KageStory(this) : null;   // the campaign (web/story.js)
+  this.story = window.KageStory && this.foot ? new KageStory(this) : null;
+  this.eras = window.KageEras && this.foot ? new KageEras(this) : null;   // explorable eras through the EPOCH (web/eras.js)   // the campaign (web/story.js)
   this.ampyobj = window.KageAmpyObj ? new KageAmpyObj(this) : null;   // imported OBJ assets placed in the world (web/ampyobj.js)   // AmpybiOS tablet shell (web/ampyos.js)
   this.tech = window.KageTech && this.foot ? new KageTech(this) : null;   // technician's tablet (web/tech.js)
   this.mono = window.KageGlyphs && this.foot ? new KageGlyphs(this) : null;   // monoliths + the CUSTODI language (web/monolith.js)
@@ -597,19 +598,20 @@ Game.prototype.frame = function (dt, inp) {
   const cityPal = CYBER_PALETTES[o.palette] || CYBER_PALETTES.neon;
   const past = this.world === 'meadow';
   const eco = this.world === 'eco';
-  let pal = past ? Object.assign({}, cityPal, MEADOW_PAL) : eco ? Object.assign({}, cityPal, KageNexus.ECO_PAL) : cityPal;
+  const ERA = past && this.era && window.KageEras ? KageEras.ERAS[this.era] : null;
+  let pal = past ? Object.assign({}, cityPal, MEADOW_PAL, ERA ? ERA.pal : {}) : eco ? Object.assign({}, cityPal, KageNexus.ECO_PAL) : cityPal;
   // real light and weather where you are (web/realsky.js): day / dusk / night from the sun, live weather unless you picked one
   const SPACE = this.world === 'space' || this.world === 'planet';
   const RS = !past && !eco && !SPACE && window.getRealSky ? getRealSky() : null;
   if (RS && RS.enabled) pal = RS.apply(pal);
   if (this.star) pal = this.star.pal(pal);
-  this.dayK = past ? 1 : (this.star && this.star.dayK() !== null) ? this.star.dayK() : RS ? RS.dayK() : 0;
+  this.dayK = past ? (ERA ? ERA.day : 1) : (this.star && this.star.dayK() !== null) ? this.star.dayK() : RS ? RS.dayK() : 0;
   const wx = past || SPACE ? null : (CYBER_WEATHER[o.weather || (RS && RS.weather()) || ''] || null);
   this.t += dt; const t = this.t;
   this.flash = Math.max(0, this.flash - dt * 3.5);
   if (wx && wx.light > 0) { this.nextFlash -= dt; if (this.nextFlash <= 0) { this.flash = 1; this.nextFlash = Math.random() < 0.35 ? 0.15 : 4 + Math.random() * 9; } }
   this.c.pk = { v8: 1, wankel: 1.03, mag: 1.1 }[o.power || 'v8'] || 1;
-  this.c.world = this.world; this.c.meadow = this.meadow;
+  this.c.world = this.world; this.c.meadow = this.meadow; this.c.era = this.era;
   // LEVITA flight: hover higher (and keep hovering a little when not flying)
   const flyT = (o.power === 'mag' && o.fly) ? 1 : 0;
   this.fly = (this.fly || 0) + Math.max(-dt * 0.8, Math.min(dt * 0.8, flyT - (this.fly || 0)));
@@ -627,6 +629,7 @@ Game.prototype.frame = function (dt, inp) {
   if (this.mono) this.mono.update(dt);
   if (this.tech) this.tech.update(dt);
   if (this.story) this.story.update(dt);
+  if (this.eras) this.eras.update(dt);
   if (this.editor) this.editor.update(dt);
   if (this.net) this.net.update(dt);
   if (this.people) this.people.update(dt);
@@ -704,14 +707,15 @@ Game.prototype.frame = function (dt, inp) {
   const sp = P.sky; gl.useProgram(sp.p); set(sp);
   gl.uniform3fv(sp.u.uFwd, V.f); gl.uniform3fv(sp.u.uRight, V.r); gl.uniform3fv(sp.u.uUp, V.u);
   const ty = Math.tan(fov / 2); gl.uniform2f(sp.u.uTan, ty * W / H, ty);
-  if (sp.u.uCloud) gl.uniform1f(sp.u.uCloud, past ? 0.45 : wx ? wx.cloud : 0);
+  if (sp.u.uCloud) gl.uniform1f(sp.u.uCloud, past ? (ERA ? ERA.cloud : 0.45) : wx ? wx.cloud : 0);
   if (sp.u.uDay) gl.uniform1f(sp.u.uDay, this.dayK);
   gl.uniform3fv(sp.u.uSunDir, pal.sunDir); gl.uniform3fv(sp.u.uSunCol, pal.sun); gl.uniform1f(sp.u.uSunStripes, pal.stripes);
   if (!UNDER && this.world !== 'space') this.draw(sp, this.M.quad);   // deep space: black, the stars come from the ODYSSEY's starfield
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
   if (past) {
-    const g = P.meadow; gl.useProgram(g.p); set(g); gl.uniform3fv(g.u.uSunDir, pal.sunDir); gl.uniform3fv(g.u.uSunCol, pal.sun); this.draw(g, this.M.ground);
-    const nt = P.nature; gl.useProgram(nt.p); set(nt); gl.uniform3fv(nt.u.uSunDir, pal.sunDir); gl.uniform3fv(nt.u.uSunCol, pal.sun); for (const m of this.M.nature) this.draw(nt, m);
+    const g = P.meadow; gl.useProgram(g.p); set(g); gl.uniform3fv(g.u.uSunDir, pal.sunDir); gl.uniform3fv(g.u.uSunCol, pal.sun); if (g.u.uEra) gl.uniform1f(g.u.uEra, ERA ? ERA.ground : 0); this.draw(g, this.M.ground);
+    if (!ERA) { const nt = P.nature; gl.useProgram(nt.p); set(nt); gl.uniform3fv(nt.u.uSunDir, pal.sunDir); gl.uniform3fv(nt.u.uSunCol, pal.sun); for (const m of this.M.nature) this.draw(nt, m); }
+    if (this.eras) this.eras.drawWorld({ set, camX, camZ, t, pal, dt });
     // in the past too: your vehicle, your pilot on foot and the EPOCH cabin
     if (this.fleet) this.fleet.drawPlayer({ set, camX, camZ, t, pal, dt });
     if (FOOT) this.foot.draw({ set, camX, camZ, t, pal, dt });
@@ -813,11 +817,11 @@ Game.prototype.frame = function (dt, inp) {
     const lp = P.lens; gl.useProgram(lp.p); set(lp); gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.depthMask(false);
     gl.uniform1i(lp.u.uTex, 0); gl.uniform2f(lp.u.uC, cx, cy); gl.uniform1f(lp.u.uR, R); gl.uniform1f(lp.u.uK, k); gl.uniform3fv(lp.u.uCol, li.col); gl.uniform2f(lp.u.uRes, W, H);
     this.draw(lp, this.M.quad); gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); } }
-  const rainAmt = SPACE ? 0 : UNDER ? 0.55 : eco ? 0.6 : wx ? wx.rain : past ? 0 : (o.rain || 0);
+  const rainAmt = SPACE ? 0 : UNDER ? 0.55 : eco ? 0.6 : wx ? wx.rain : past ? (ERA && ERA.snow ? 0.7 : 0) : (o.rain || 0);
   if (rainAmt > 0) {
     gl.useProgram(P.rain.p); set(P.rain); gl.uniform1f(P.rain.u.uCamZ, camZ % 84);
-    gl.uniform1f(P.rain.u.uRain, rainAmt); gl.uniform1f(P.rain.u.uRainSpeed, UNDER ? 2.5 : eco ? -14 : 28);   // in ECO the rain falls upwards; under water: marine snow
-    if (P.rain.u.uSnow) gl.uniform1f(P.rain.u.uSnow, UNDER ? 1 : wx ? wx.snow : 0); if (P.rain.u.uWind) gl.uniform1f(P.rain.u.uWind, UNDER ? 0 : wx ? wx.wind : 0);
+    gl.uniform1f(P.rain.u.uRain, rainAmt); gl.uniform1f(P.rain.u.uRainSpeed, UNDER ? 2.5 : eco ? -14 : ERA && ERA.snow ? 5 : 28);   // in ECO the rain falls upwards; under water: marine snow
+    if (P.rain.u.uSnow) gl.uniform1f(P.rain.u.uSnow, UNDER ? 1 : wx ? wx.snow : ERA && ERA.snow ? 1 : 0); if (P.rain.u.uWind) gl.uniform1f(P.rain.u.uWind, UNDER ? 0 : wx ? wx.wind : 0);
     if (P.rain.u.uRainCenter) gl.uniform1f(P.rain.u.uRainCenter, UNDER || VEH ? 1 : 0);
     this.draw(P.rain, this.M.rain);
   }
@@ -842,6 +846,7 @@ Game.prototype.frame = function (dt, inp) {
   if (this.mono) this.mono.drawHud(this.hud);
   if (this.tech) this.tech.drawHud(this.hud);
   if (this.story) this.story.drawHud(this.hud);
+  if (this.eras) this.eras.drawHud(this.hud);
   if (this.editor) this.editor.drawHud(this.hud);
   if (this.net) this.net.drawHud(this.hud);
   if (window.realSky && realSky.enabled && !SPACE && !(this.xeno && this.xeno.tt) && !(this.star && this.star.involved())) { const g2 = this.hud.getContext('2d'), m2 = Math.min(this.hud.width, this.hud.height), ln = realSky.line();
@@ -899,7 +904,7 @@ Game.prototype.drawHud = function (inp) {
     g.font = (m * 0.016 | 0) + 'px monospace'; g.fillStyle = '#ecfcff'; g.textAlign = 'center';
     g.fillText(this.tj.cool > 0 ? 'CRONO · RICARICA' : k > 0 ? 'CRONO · TIENI 300 KM/H' : 'CRONO · PRONTO A 300 KM/H', cx, by - m * 0.012);
   }
-  if (this.world === 'meadow') { g.font = 'bold ' + (m * 0.024 | 0) + 'px monospace'; g.textAlign = 'left'; g.fillStyle = '#fff6c8'; g.fillText('⏳ PRATERIA DEL PASSATO', m * 0.03, m * 0.13); }
+  if (this.world === 'meadow') { g.font = 'bold ' + (m * 0.024 | 0) + 'px monospace'; g.textAlign = 'left'; g.fillStyle = '#fff6c8'; g.fillText('⏳ ' + (this.era && window.KageEras ? KageEras.ERAS[this.era].name : 'PRATERIA DEL PASSATO'), m * 0.03, m * 0.13); }
   if (this.eng) {   // rev counter: thin inner arc + gear
     const e = this.eng, kr = Math.min(1, e.rpm / e.T.limiter);
     g.lineWidth = m * 0.006; g.strokeStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.arc(cx, cy, r * 0.8, Math.PI * 0.75, Math.PI * 2.25); g.stroke();

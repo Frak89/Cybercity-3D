@@ -63,7 +63,7 @@ XenoGame.prototype.update = function (dt, inp) {
     if (this.au) { this.au.start(); this.au.on = !!T; this.au.update(T ? 'chrono' : null, { thrust: T && T.phase === 'vortex' ? 1 : 0.4 }); } }
   if (T) { T.t += dt;
     if (T.phase === 'in' && T.t > 1.3) { T.phase = 'vortex'; T.t = 0; }
-    else if (T.phase === 'vortex' && T.t > 6.5) { T.phase = 'out'; T.t = 0; g.world = g.world === 'meadow' ? 'city' : 'meadow'; if (g.fx) g.fx.p.length = 0; if (g.tj) { g.tj.white = 1; g.tj.arrive = 1; } }
+    else if (T.phase === 'vortex' && T.t > 6.5) { T.phase = 'out'; T.t = 0; if (g.world === 'meadow') { g.world = 'city'; g.era = null; } else { g.world = 'meadow'; g.era = this.dest || null; } this.dest = null; if (g.fx) g.fx.p.length = 0; if (g.tj) { g.tj.white = 1; g.tj.arrive = 1; } }
     else if (T.phase === 'out' && T.t > 1.2) { this.tt = null; if (f) { const fx = Math.sin(EPOCH.h), fz = Math.cos(EPOCH.h); f.x = wrapP(EPOCH.x + fx * 1.9); f.z = wrapP(EPOCH.z + fz * 1.9); f.h = EPOCH.h; } } }
 };
 /** time vortex camera: high above the city, flying down the tunnel */
@@ -225,7 +225,7 @@ XenoGame.prototype.drawHud = function (hud) {
   const g = this.g, f = g.foot, ctx2 = hud.getContext('2d'), W = hud.width, H = hud.height, m = Math.min(W, H);
   let line = '', big = '';
   const T = this.tt; if (f && f.ss) return;
-  if (T) { big = T.phase === 'vortex' ? 'VORTICE TEMPORALE' : 'KAGE EPOCH'; line = T.phase === 'vortex' ? (g.world === 'meadow' ? 'verso CYBERCITY · OGGI' : 'verso la PRATERIA DEL PASSATO') : T.phase === 'in' ? 'chiudi la porta… si parte' : 'ARRIVO'; }
+  if (T) { big = T.phase === 'vortex' ? 'VORTICE TEMPORALE' : 'KAGE EPOCH'; line = T.phase === 'vortex' ? (g.world === 'meadow' ? 'verso CYBERCITY · 2087' : 'verso ' + (this.dest && window.KageEras ? KageEras.ERAS[this.dest].name : 'la PRATERIA DEL PASSATO')) : T.phase === 'in' ? 'chiudi la porta… si parte' : 'ARRIVO'; }
   else if (f && f.active && !g.veh) {
     if (f.xs === 'in') {
       const dp = Math.hypot(f.lx - R.lift[0], f.lz - R.lift[1]), ds = Math.hypot(f.lx - R.seat[0], f.lz - (R.seat[1] - 0.15));

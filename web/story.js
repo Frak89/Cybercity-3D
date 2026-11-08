@@ -98,12 +98,12 @@ Story.prototype.flag = function (k, v) { if (v !== undefined) { if (!this.st.fla
 Story.prototype.cur = function () { return this.C[Math.min(this.st.ch, this.C.length - 1)]; };
 Story.prototype.finished = function () { return this.st.ch >= this.C.length; };
 const BACK = { id: '_back', t: 'Sei nel passato: torna nell’EPOCH per rientrare a Cybercity', at: () => [30, 27] };
-Story.prototype.objective = function () { if (this.g.world === 'meadow' && this.st.ch < 6 && this.st.prologue) return BACK; if (this.finished()) return null; return this.cur().obj.find(o => !this.st.done[o.id]) || null; };
+Story.prototype.objective = function () { if (this.g.era && this.g.eras) return this.g.eras.objective(); if (this.g.world === 'meadow' && this.st.ch < 6 && this.st.prologue) return BACK; if (this.finished()) return null; return this.cur().obj.find(o => !this.st.done[o.id]) || null; };
 Story.prototype.update = function (dt) {
   this.t += dt; this.toastT = Math.max(0, this.toastT - dt); const g = this.g;
   if (g.aos && g.aos.isOpen) this.flag('tab', 1); if (g.tech && g.tech.cur && g.tech.cur.id === 'gt') this.flag('gt', 1); if (g.star && g.star.wake) this.flag('pod', 1);
   // the meadow of the past: places you discover, the elder, the guide stones, the seed
-  if (g.world === 'meadow') { const f = g.foot, p = f && f.active ? f : g.c, d = P => Math.hypot(wrapD(p.x - P.x), wrapD(p.z - P.z)), st = this.st; st.seenM = st.seenM || {};
+  if (g.world === 'meadow' && !g.era) { const f = g.foot, p = f && f.active ? f : g.c, d = P => Math.hypot(wrapD(p.x - P.x), wrapD(p.z - P.z)), st = this.st; st.seenM = st.seenM || {};
     for (const [k, P, r, s] of [['camp', CAMP, 14, '⛺ L’ACCAMPAMENTO DEI PRIMI'], ['circle', CIRCLE, 16, '🗿 IL CERCHIO DI PIETRE'], ['wreck', WRECK, 22, '🛸 IL RELITTO DEI CUSTODI · caddero dal cielo, migliaia di anni fa']]) if (!st.seenM[k] && d(P) < r) { st.seenM[k] = 1; this.save(); this.toast(s); this.chime(1); }
     const ch7 = st.ch === 6;
     if (ch7 && !st.elder && f && f.active && d({ x: CAMP.x + 3, z: CAMP.z + 1.5 }) < 2.6 && !this.dlg) { st.elder = 1; this.save(); this.radio(ELDER_LINES, 'L’ANZIANA DEI PRIMI', 'elder'); }
@@ -145,7 +145,7 @@ const WHO = { vega: '📡 VEGA · KAGE ODYSSEY', aria: '🛠 ARIA · KAGE GARAGE
 Story.prototype.radio = function (lines, head, who, onDone) {
   const ch = this.cur(); if (!lines && this.finished()) return;
   this.dlg = { lines: lines || ch.radio, i: 0, head: head || (ch.title), n: 0, onDone }; if (!lines) { this.st.seen[ch.id] = 1; this.save(); }
-  this.ui.className = who || 'vega'; this.ui.style.display = 'flex'; this.ui.querySelector('b').textContent = WHO[who || 'vega'] + ' — ' + this.dlg.head; this.type(); this.chime(1);
+  const known = !!WHO[who || 'vega']; this.ui.className = known ? who || 'vega' : 'elder'; this.ui.style.display = 'flex'; this.ui.querySelector('b').textContent = (known ? WHO[who || 'vega'] : who) + ' — ' + this.dlg.head; this.type(); this.chime(1);
 };
 Story.prototype.type = function () { const D = this.dlg, el = this.ui.querySelector('.tx'), s = D.lines[D.i]; D.n = 0; clearInterval(this.tyT);
   this.tyT = setInterval(() => { D.n += 2; el.textContent = s.slice(0, D.n); if (D.n >= s.length) clearInterval(this.tyT); if (this.au && D.n % 6 === 0) this.au.blip(900 + Math.random() * 300, 700, 0.03, 0.03, 'square'); }, 30); };
@@ -190,7 +190,7 @@ Story.prototype.drawWorld = function (ctx) {
   if (g.world === 'city' && st.aria && window.KagePilot) { const A = st.aria, r = rel(A.x, A.z); if (Math.hypot(r[0], r[1]) < 140) { const f = g.foot, nr = f && f.active && Math.hypot(wrapD(f.x - A.x), wrapD(f.z - A.z)) < 7;
       this.ariaM = this.ariaM || (() => { const m = KagePilot.build(Object.assign({}, window.KageAriaLook || { suit: 'blu' }), 'hi'), vm = g.vmesh(m); vm.S = m.S; return vm; })();
       const h = f && f.active ? Math.atan2(wrapD(f.x - A.x), wrapD(f.z - A.z)) : 0; F.drawPilotPose(ctx.set, U.mul(U.T(r[0], 0, r[1]), U.RY(h)), nr ? (this.dlg && this.ui.className === 'aria' ? 'indica' : 'saluto') : 'mani sui fianchi', { key: 'aria' }, this.ariaM, ctx.t); } }
-  if (g.world !== 'meadow') return;
+  if (g.world !== 'meadow' || g.era) return;
   prep();
   put(M('camp', buildCamp), CAMP.x, 0, CAMP.z, 0, 1);
   put(M('circle', buildCircle), CIRCLE.x, 0, CIRCLE.z, 0, 1);
@@ -223,7 +223,7 @@ Story.prototype.drawHud = function (hud) {
   const o = this.objective(), f = g.foot;
   if (o) { const ln = '◆ ' + o.t; c2.font = 'bold ' + (m * 0.022 | 0) + 'px system-ui,sans-serif'; c2.textAlign = 'left'; const w = c2.measureText(ln).width + m * 0.04, y = m * 0.13;
     c2.fillStyle = 'rgba(6,10,20,0.62)'; c2.fillRect(m * 0.02, y - m * 0.032, w, m * 0.046); c2.fillStyle = '#8fd6ff'; c2.fillText(ln, m * 0.04, y);
-    c2.font = (m * 0.016 | 0) + 'px system-ui,sans-serif'; c2.fillStyle = 'rgba(200,230,255,.7)'; c2.fillText(this.cur().title, m * 0.04, y - m * 0.04);
+    c2.font = (m * 0.016 | 0) + 'px system-ui,sans-serif'; c2.fillStyle = 'rgba(200,230,255,.7)'; c2.fillText(o.era || this.cur().title, m * 0.04, y - m * 0.04);
     // waypoint: arrow at the screen edge or a marker over the target, with the distance
     const tg = this.target(), VP = g.VP; if (tg && VP && this.camX !== undefined && (g.world === 'city' || g.world === 'meadow') && !(f && f.ss)) {
       const rx = wrapD(tg[0] - this.camX), rz = wrapD(tg[1] - this.camZ), p = [rx, 2, rz, 1], q = [0, 0, 0, 0]; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) q[i] += VP[j * 4 + i] * p[j];
@@ -249,7 +249,7 @@ function install(OS) {
       + '<button class="btn" data-act="radio">📡 riascolta VEGA</button> <button class="btn" data-act="storyreset">↺ nuova partita (dal prologo)</button> <button class="btn ' + (st.free ? 'on' : '') + '" data-act="storyfree">' + (st.free ? '🔓 modalità libera: tutto sbloccato' : '🔒 sblocco con la storia') + '</button></div>'
       + Sg.C.map((c, i) => { const cur = i === st.ch, past = i < st.ch; if (i > st.ch) return '<div class="card" style="opacity:.45"><b>' + c.title + '</b><br><small>bloccato</small></div>';
         return '<div class="card ' + (cur ? 'n' : '') + '"><b>' + (past ? '✔ ' : '◆ ') + c.title + '</b>' + c.obj.map(o => '<div style="margin-top:.5vmin">' + (st.done[o.id] ? '☑' : '☐') + ' ' + o.t + '</div>').join('') + '</div>'; }).join('')
-      + (window.KageChron && Sg.cuts ? (() => { const CH = KageChron, ok = CH.unlocked(Sg), dn = CH.done(); return '<div class="card"><b>⏳ Cronache del tempo</b><br><small>' + (ok ? 'Viaggi con l’EPOCH in altre epoche. Ogni cronaca lascia un ricordo.' : '🔒 si sbloccano con l’EPOCH (capitolo VII)') + '</small><br>'
+      + (window.KageChron && Sg.cuts ? (() => { const CH = KageChron, ok = CH.unlocked(Sg), dn = CH.done(); return '<div class="card"><b>⏳ Cronache del tempo</b><br><small>' + (ok ? 'Per esplorarle davvero: entra nell’EPOCH nel garage e scegli l’epoca. Qui puoi giocarle come scene illustrate.' : '🔒 si sbloccano con l’EPOCH (capitolo VII)') + '</small><br>'
         + CH.EPIS.map(e => '<button class="btn" data-act="chron" data-id="' + e.id + '"' + (ok ? '' : ' disabled style="opacity:.4"') + '>' + (dn.includes(e.id) ? '✔ ' : e.ic + ' ') + e.title + '</button> ').join('')
         + (dn.length ? '<div style="margin-top:.6vmin">Ricordi: ' + CH.EPIS.filter(e => dn.includes(e.id)).map(e => e.reward).join(' · ') + '</div>' : '') + '</div>'; })() : '')
       + (Sg.cuts ? '<div class="card"><b>🎬 Scene della storia</b><br>' + (Sg.st.prologue ? '<button class="btn" data-act="cut" data-id="prologo">▶ IL RISVEGLIO</button> ' : '') + Sg.cuts.list().map(x => (Sg.cuts.seen().includes(x.id) || st.free || st.ch >= x.at) ? '<button class="btn" data-act="cut" data-id="' + x.id + '">▶ ' + x.title + '</button> ' : '<button class="btn" disabled style="opacity:.4">🔒 ' + x.title + '</button> ').join('') + '</div>' : ''));

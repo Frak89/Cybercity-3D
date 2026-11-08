@@ -81,6 +81,7 @@
 <script>/*PROLOGUE*/</script>
 <script>/*CUTS*/</script>
 <script>/*STORY*/</script>
+<script>/*ERAS*/</script>
 <script>/*EDIT*/</script>
 <script>/*PHOTO*/</script>
 <script>/*NET*/</script>
@@ -134,6 +135,7 @@
     if(game.tech&&game.tech.key(e.code)){ e.preventDefault(); return; }
     if(game.gear&&game.gear.key(e.code)){ e.preventDefault(); return; }
     if(game.star&&game.star.key(e.code)){ e.preventDefault(); return; }
+    if(e.code==='Enter'&&game.eras&&game.eras.enter()) return;
     if(e.code==='Enter'&&game.mono&&game.mono.enter()) return;
     if(e.code==='Enter'&&game.star&&game.star.enter()) return;
     if(e.code==='Enter'&&game.xeno&&game.xeno.enter()) return;
@@ -184,7 +186,7 @@
     el.addEventListener('touchend',e=>{e.preventDefault(); tb[id]=false;}); }
   document.getElementById('tgar').addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); if(F){ F.renderUI(); fp.classList.toggle('open'); } });
   document.getElementById('tnx').addEventListener('touchstart',e=>{ e.preventDefault(); snd(); if(game.nexus) game.nexus.dial(); });
-  document.getElementById('tex').addEventListener('touchstart',e=>{ e.preventDefault(); if(game.mono&&game.mono.enter()) return; if(game.star&&game.star.enter()) return; if(game.xeno&&game.xeno.enter()) return; if(game.veh&&F){ F.exitVehicle(); return; } if(game.foot) game.foot.toggle(); });
+  document.getElementById('tex').addEventListener('touchstart',e=>{ e.preventDefault(); if(game.eras&&game.eras.enter()) return; if(game.mono&&game.mono.enter()) return; if(game.star&&game.star.enter()) return; if(game.xeno&&game.xeno.enter()) return; if(game.veh&&F){ F.exitVehicle(); return; } if(game.foot) game.foot.toggle(); });
   /* look around on foot: any finger that isn't on the joystick or a button (also a second finger while the first walks),
      or the mouse dragged on the 3D view: left / right = turn, up / down = tilt. Also on the ODYSSEY decks and on planets. */
   { const looks=new Map(), SKIP='button,.tb,#joy,#aos,#fleet,#stMenu,#glyUI,#techUI,#buildUI,#photoUI,#vega,#gearUI,#stUI,#langPill,input,textarea,label,#techBtn';
@@ -260,7 +262,7 @@
   let prev=performance.now();
   function loop(now){ if(game.power&&!game.power.tick(now)){ requestAnimationFrame(loop); return; } const dt=Math.max(0,Math.min(0.05,(now-prev)/1000)); prev=now;
     if(game.nexus){ const nx=!!game.nexus.near&&game.nexus.st==='idle'; if(nx!==loop.nx){ document.body.classList.toggle('nx',nx); loop.nx=nx; } }
-    { const ft=game.foot, xa=(game.mono?game.mono.action():'')||(game.star?game.star.action():'')||(game.xeno?game.xeno.action():''), ca=game.veh&&F?(F.exitInfo()&&F.exitInfo().spot?'SCENDI':''):ft?(ft.active?((ft.nearCar()||(F&&F.nearParked()))?'SALI':''):(ft.canExit()?'SCENDI':'')):'', lab=xa||ca, ex=!!lab;
+    { const ft=game.foot, xa=(game.eras?game.eras.action():'')||(game.mono?game.mono.action():'')||(game.star?game.star.action():'')||(game.xeno?game.xeno.action():''), ca=game.veh&&F?(F.exitInfo()&&F.exitInfo().spot?'SCENDI':''):ft?(ft.active?((ft.nearCar()||(F&&F.nearParked()))?'SALI':''):(ft.canExit()?'SCENDI':'')):'', lab=xa||ca, ex=!!lab;
       if(ex!==loop.ex){ document.body.classList.toggle('ex',ex); loop.ex=ex; } if(lab&&lab!==loop.lab){ document.getElementById('tex').textContent=tr(lab); loop.lab=lab; }
       const gar=!!(F&&F.inGarage()); if(gar!==loop.gar){ document.body.classList.toggle('gar',gar); loop.gar=gar; }
       { const B=document.body.classList, on=(c,v)=>{ if(B.contains(c)!==v) B.toggle(c,v); }; on('inveh',!!game.veh); on('helm',!!(ft&&ft.active&&ft.ss==='helm')); on('eva',!!(ft&&ft.active&&ft.ss==='eva')); on('inship',!!(ft&&ft.active&&ft.ss)); }

@@ -675,4 +675,5 @@ PAIRS = [
 ("L’OFFICINA DI ARIA", "ARIA’S WORKSHOP"), ("IL LUCERNARIO", "THE SKYLIGHT"), ("LA ROTTA", "THE COURSE"), ("IL QUADERNO", "THE JOURNAL"), ("L’ALBA SU CYBERCITY", "DAWN OVER CYBERCITY"),
 ("⏳ Cronache del tempo", "⏳ Time chronicles"), ("Viaggi con l’EPOCH in altre epoche. Ogni cronaca lascia un ricordo.", "Journeys with the EPOCH to other eras. Each chronicle leaves a keepsake."), ("🔒 si sbloccano con l’EPOCH (capitolo VII)", "🔒 unlocked with the EPOCH (chapter VII)"), ("Ricordi:", "Keepsakes:"),
 ("LA GRANDE TARTARIA · 1780", "GREAT TARTARY · 1780"), ("ANTICO EGITTO · 2560 a.C.", "ANCIENT EGYPT · 2560 BC"), ("OGGI · LA GUERRA ALL’IA", "TODAY · THE WAR ON AI"), ("🔶 Sfera di rame", "🔶 Copper sphere"), ("🪲 Scarabeo dei Custodi", "🪲 Custodians' scarab"), ("💠 Chip di ORIONE-7", "💠 ORIONE-7's chip"), ("🔷 Frammento di MIRROR", "🔷 Fragment of MIRROR"),
+("Per esplorarle davvero: entra nell’EPOCH nel garage e scegli l’epoca. Qui puoi giocarle come scene illustrate.", "To really explore them: step into the EPOCH in the garage and choose the era. Here you can play them as illustrated scenes."),
 ]
