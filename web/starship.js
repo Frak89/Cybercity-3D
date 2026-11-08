@@ -153,6 +153,18 @@ function buildStarship(o, lod) {
   const m = mb.finish(); m.kind = 'starship'; return m;
 }
 
+
+/** warp-coil glow overlay (additive): the coils, the nacelle flanks and the bussard collectors light up as the field builds */
+function buildNacelleGlow(o) {
+  o = Object.assign({}, SHIP_DEF, o || {}); const mb = new MB(), wc = WARPC[o.warp] || WARPC.ciano, G = c => mat(c, 1, 3);
+  for (const s of [-1, 1]) { const nx = s * 27, ny = 6;
+    mb.part = 'bobine_luce'; for (let i = 0; i < 9; i++) { const z = -54 + i * 5.6; mb.box(nx - s * 3.78, ny, z, 0.12, 3.1, 4.7, G(wc)); mb.box(nx + s * 3.7, ny, z, 0.1, 1.6, 4.4, G(wc.map(v => v * 0.6))); }
+    mb.part = 'fianchi_luce'; for (const dy of [-1, 1]) mb.box(nx, ny + dy * 3.85, -26, 1.6, 0.1, 50, G(wc.map(v => v * 0.7)));
+    mb.part = 'collettore_luce'; mb.ellipsoid(nx, ny, 2.1, 3.05, 3.15, 2.95, 20, 12, G([1, 0.35, 0.8]));
+    mb.part = 'scarico_luce'; mb.push(T(nx, ny, -62.4)); mb.push(RX(PI / 2)); mb.disc(2.1, 20, 0, G(wc)); mb.pop(); mb.pop(); }
+  return mb.finish();
+}
+
 /* ---------------- decks (walkable interiors; cut = cutaway for the showroom: no ceiling, no near wall) ---------------- */
 function buildDeck(id, o, lod) {
   o = Object.assign({}, SHIP_DEF, o || {}); lod = lod || o.lod;
@@ -381,5 +393,5 @@ KF.KINDS.starship = { build: (o, lod) => { o = Object.assign({}, SHIP_DEF, o || 
   opts: SHIP_OPTS, names: SHIP_NAMES, def: SHIP_DEF, rig: RIG, title: 'KAGE ODYSSEY', extra: true };
 Object.assign(KF.OPT_TITLES, { view: 'VISTA', warp: 'GONDOLE WARP' });
 root.KageStar = { buildStarship, buildDeck, buildBadge, buildDisplay, buildPlanet, buildStars, buildStreaks, buildClouds, buildSite, siteHeight, hexBadge,
-  STASIS, REPLI, MESS, messChairs, DECKS, LIFT_Z, RIG, DEST, DEST_ORDER, SITES, WARP_STEPS, warpC, dist, SHIP_DEF };
+  STASIS, REPLI, MESS, messChairs, DECKS, LIFT_Z, RIG, DEST, DEST_ORDER, SITES, WARP_STEPS, warpC, dist, SHIP_DEF, buildNacelleGlow };
 })(typeof window !== 'undefined' ? window : globalThis);

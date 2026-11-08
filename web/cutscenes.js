@@ -178,7 +178,7 @@ Cuts.prototype.loop = function () {
 };
 Cuts.prototype.draw = function () {
   const c = this.cvs.getContext('2d'), W = this.cvs.width, H = this.cvs.height; c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-  c.save(); c.translate(this.ox, this.oy); c.scale(this.k, this.k); c.beginPath(); c.rect(0, 0, VW, VH); c.clip(); c.textAlign = 'left'; this.S.draw(c, this.t, this.st); c.restore();
+  c.save(); c.translate(this.ox, this.oy); c.scale(this.k, this.k); c.beginPath(); c.rect(0, 0, VW, VH); c.clip(); c.textAlign = 'left'; this.S.draw(c, this.t, this.st, this); c.restore();
   if (this.titleT > 0) { const a = Math.min(1, this.titleT); c.globalAlpha = a; c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(0, H * 0.06, W, H * 0.11); c.fillStyle = '#ffe08a'; c.textAlign = 'center'; c.font = '300 ' + Math.round(H * 0.06) + 'px Georgia,serif'; c.fillText(this.S.title, W / 2, H * 0.14); c.globalAlpha = 1; }
   if (this.cur) { const txt = this.cur.slice(0, Math.floor(this.shown)), m = this.cur.match(/^([A-Z][A-Z ()a-zà]+): /), name = m ? m[1] : '', body = m ? txt.slice(m[0].length) : txt;
     c.textAlign = 'center'; c.font = (m ? '' : 'italic ') + Math.round(H * 0.034) + 'px Georgia,serif'; const w = Math.min(W * 0.92, c.measureText(m ? this.cur.slice(m[0].length) : this.cur).width + H * 0.08);
@@ -187,5 +187,7 @@ Cuts.prototype.draw = function () {
   if (this.msgT > 0) { c.textAlign = 'center'; c.font = 'bold ' + Math.round(H * 0.03) + 'px monospace'; c.fillStyle = '#ff7060'; c.fillText(this.msg, W / 2, H * 0.22); }
   c.textAlign = 'left';
 };
-window.KageCuts = Cuts; window.KageCutScenes = SCENES;
+window.KageCuts = Cuts; window.KageCutScenes = SCENES; window.KageCutKit = { rr, glow, glyph, person, inR, VW, VH };
+// an episode = several scenes in a row (the time chronicles)
+Cuts.prototype.episode = function (ids, done) { const L = ids.slice(), next = () => { const id = L.shift(); if (!id) { if (done) done(); return; } this.play(id, next); }; next(); };
 })();

@@ -276,9 +276,10 @@ Tech.prototype.update = function (dt) {
 Tech.prototype.drawHud = function (hud) {
   const c2 = hud.getContext('2d'), m = Math.min(hud.width, hud.height); let ln = '';
   if (this.runs.length) ln = '🔧 KAGE TECH · ' + this.dname(this.runs[0].d) + ' · ' + (this.runs.length > 1 ? this.runs.length + ' programmi in esecuzione' : 'programma in esecuzione');
-  else if (!this.open && this.free()) { const n = this.inRange().filter(d => this.faults(d).length).length; if (n) ln = '🔧 ' + n + ' dispositiv' + (n > 1 ? 'i' : 'o') + ' vicin' + (n > 1 ? 'i' : 'o') + ' segnala' + (n > 1 ? 'no' : '') + ' un guasto · U / 📱 TABLET'; }
+  else if (!this.open && this.free()) { const n = this.inRange().filter(d => this.faults(d).length).length; if (n) ln = '🔧 ' + n + ' dispositiv' + (n > 1 ? 'i' : 'o') + ' vicin' + (n > 1 ? 'i' : 'o') + ' segnala' + (n > 1 ? 'no' : '') + ' un guasto · ' + (document.body.classList.contains('touch') ? '📱 TABLET' : 'U / 📱 TABLET'); }
   if (!ln) return; c2.font = (m * 0.019 | 0) + 'px monospace'; c2.textAlign = 'left'; const w = c2.measureText(ln).width + m * 0.03;
-  c2.fillStyle = 'rgba(3,10,6,0.65)'; c2.fillRect(m * 0.02, hud.height - m * 0.168, w, m * 0.036); c2.fillStyle = '#9dff8a'; c2.fillText(ln, m * 0.035, hud.height - m * 0.143);
+  const y = document.body.classList.contains('touch') ? m * 0.235 : hud.height - m * 0.168;   // on phones: under the objective, clear of the joystick
+  c2.fillStyle = 'rgba(3,10,6,0.65)'; c2.fillRect(m * 0.02, y, w, m * 0.036); c2.fillStyle = '#9dff8a'; c2.fillText(ln, m * 0.035, y + m * 0.025);
 };
 
 /* ---------------- UI ---------------- */

@@ -100,7 +100,7 @@ body.aosfull #langPill{display:none}
 #aos .app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);animation:aosIn .28s ease-out}
 @keyframes aosIn{from{transform:scale(.94)}to{transform:none}}
 #aos .bar{display:flex;align-items:center;gap:1.2vmin;padding:.8vmin 2vmin;font-size:2vmin;border-bottom:1px solid color-mix(in srgb,var(--ac) 30%,transparent)} #aos .bar .t{flex:1;font-weight:600}
-#aos .body{flex:1;min-height:0;overflow:auto;padding:1.6vmin 2.4vmin;font-size:1.8vmin;position:relative}
+#aos .body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y pinch-zoom;padding:1.6vmin 2.4vmin;font-size:1.8vmin;position:relative}
 #aos .btn{background:var(--sf);color:var(--fg);border:1px solid color-mix(in srgb,var(--ac) 60%,transparent);border-radius:var(--rtl) var(--rtr) var(--rbr) var(--rbl);padding:.9vmin 1.6vmin;font:inherit;font-size:1.7vmin;cursor:pointer}
 #aos .btn.on{background:color-mix(in srgb,var(--ac) 40%,var(--sf))} #aos .card{background:var(--sf);border-radius:var(--rtl) var(--rtr) var(--rbr) var(--rbl);padding:1.4vmin 1.8vmin;margin:0 0 1.2vmin}
 #aos .kv{display:grid;grid-template-columns:auto 1fr;gap:.5vmin 2vmin} #aos .kv span:nth-child(odd){opacity:.65}
@@ -111,7 +111,7 @@ body.aosfull #langPill{display:none}
 #aos #techUI{position:absolute!important;inset:0!important;width:auto!important;top:0!important;right:0!important;bottom:0!important;border:none!important;border-radius:0!important;box-shadow:none!important;display:flex!important;background:var(--bg)!important}
 #aos canvas{position:static;inset:auto} #aos .n{border-left:.4vmin solid var(--ac)}
 #aos .home{position:relative;padding:2vmin 4vmin 0;display:flex;flex-direction:column;height:100%;box-sizing:border-box}
-#aos .pages{flex:1;min-height:0;overflow:hidden;position:relative} #aos .strip{display:flex;height:100%;will-change:transform} #aos .pg{flex:0 0 100%;height:100%;overflow:hidden;padding:1vmin .5vmin;box-sizing:border-box}
+#aos .pages{flex:1;min-height:0;overflow:hidden;position:relative;touch-action:pan-y} #aos .strip{display:flex;height:100%;will-change:transform} #aos .pg{flex:0 0 100%;height:100%;overflow:hidden;padding:1vmin .5vmin;box-sizing:border-box}
 #aos .grid{grid-template-columns:repeat(auto-fill,minmax(14vmin,1fr));gap:2.4vmin 1.6vmin}
 #aos .ico{transition:transform .16s ease,filter .16s} #aos .ico.press,#aos .ico:active{transform:scale(.86);filter:brightness(1.35)} #aos .ico .lbl{max-width:15vmin;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #aos .ico i{transition:box-shadow .2s} #aos .ico:hover i{box-shadow:0 0 0 1px var(--ac),0 0 3vmin color-mix(in srgb,var(--ac) 55%,transparent)}
@@ -224,12 +224,12 @@ AmpyOS.prototype.goPage = function (i, instant) { const st = this.view().querySe
 /** gestures on the screen: swipe pages, swipe from the left edge = back, swipe down from the top = quick settings, long press = info */
 AmpyOS.prototype.gestures = function () {
   const scr = this.root.querySelector('.scr'); let g = null, lp = null;
-  scr.addEventListener('pointerdown', e => { if (this.busy) return; const r = scr.getBoundingClientRect(); g = { x: e.clientX, y: e.clientY, t: performance.now(), edge: e.clientX - r.left < r.width * 0.035, top: e.clientY - r.top < r.height * 0.1, id: e.pointerId, moved: false };
+  scr.addEventListener('pointerdown', e => { if (this.busy) return; const r = scr.getBoundingClientRect(); g = { x: e.clientX, y: e.clientY, t: performance.now(), edge: e.clientX - r.left < r.width * 0.035, top: e.clientY - r.top < r.height * 0.1, id: e.pointerId, moved: false, lx: e.clientX, ly: e.clientY };
     const ico = e.target.closest('.ico,.w'); if (ico) { ico.classList.add('press'); lp = setTimeout(() => { lp = null; ico.classList.remove('press'); g = null; this.vib(30); this.info(ico.dataset.app); }, 520); } });
-  scr.addEventListener('pointermove', e => { if (!g || e.pointerId !== g.id) return; const dx = e.clientX - g.x, dy = e.clientY - g.y; if (Math.hypot(dx, dy) > 10) { g.moved = true; if (lp) { clearTimeout(lp); lp = null; } scr.querySelectorAll('.press').forEach(x => x.classList.remove('press')); }
+  scr.addEventListener('pointermove', e => { if (!g || e.pointerId !== g.id) return; g.lx = e.clientX; g.ly = e.clientY; const dx = e.clientX - g.x, dy = e.clientY - g.y; if (Math.hypot(dx, dy) > 10) { g.moved = true; if (lp) { clearTimeout(lp); lp = null; } scr.querySelectorAll('.press').forEach(x => x.classList.remove('press')); }
     const st = this.view().querySelector('.strip'); if (!this.app && st && Math.abs(dx) > Math.abs(dy) && !g.edge) { st.style.transition = 'none'; st.style.transform = 'translateX(calc(' + (-this.page * 100) + '% + ' + dx + 'px))'; } });
-  const up = e => { if (lp) { clearTimeout(lp); lp = null; } scr.querySelectorAll('.press').forEach(x => x.classList.remove('press')); if (!g || e.pointerId !== g.id) return; const dx = e.clientX - g.x, dy = e.clientY - g.y, fast = performance.now() - g.t < 500, G = g; g = null;
-    if (!G.moved) return;
+  const up = e => { if (lp) { clearTimeout(lp); lp = null; } scr.querySelectorAll('.press').forEach(x => x.classList.remove('press')); if (!g || e.pointerId !== g.id) return; const cx = e.type === 'pointercancel' ? g.lx : e.clientX, cy = e.type === 'pointercancel' ? g.ly : e.clientY, dx = cx - g.x, dy = cy - g.y, fast = performance.now() - g.t < 500, G = g; g = null;
+    if (!G.moved) { if (!this.app) this.goPage(this.page); return; }   // a tap: snap the strip back where it belongs
     if (G.edge && dx > 60 && Math.abs(dy) < 80) { this.vib(8); if (this.app) this.home(); return; }
     if (G.top && dy > 70) { this.quick(true); return; }
     if (!this.app && this.view().querySelector('.strip') && Math.abs(dx) > Math.abs(dy)) { this.suppress = true; setTimeout(() => { this.suppress = false; }, 60); const w = this.view().clientWidth; this.goPage(this.page + (dx < -w * 0.18 || (fast && dx < -40) ? 1 : dx > w * 0.18 || (fast && dx > 40) ? -1 : 0)); this.vib(6); } };

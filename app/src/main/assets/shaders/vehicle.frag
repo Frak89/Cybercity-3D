@@ -9,6 +9,7 @@ uniform float uBlur;     // rotor speed → blades blur into the disc
 uniform float uLit;      // 1 normal, >1 brighter (garage)
 uniform float uDay;      // 0 night city, 1 daylight
 uniform vec3 uTint;      // race gates: tint for slot 3 (x < 0 → keep)
+uniform float uGlowDim;  // 0 = full, 1 = off (fades additive glow overlays)
 uniform float uGlowOnly; // light beams / bolts: emissive only, soft edges
 uniform float uShadow;   // ECO doppelgänger: black body, red glow
 void main(){
@@ -33,7 +34,7 @@ void main(){
     if (uGlowOnly > 0.5) {
         float face = abs(dot(N, V));
         vec3 g = vCol.rgb * vCol.a * (0.25 + 0.75 * face) * (1.0 - fogAmount(length(vWP - uEye)) * 0.9);
-        gl_FragColor = vec4(g, 1.0); return;
+        gl_FragColor = vec4(g * (1.0 - uGlowDim), 1.0); return;
     }
     if (dot(N, V) < 0.0) N = -N;
     vec3 base = vCol.rgb;

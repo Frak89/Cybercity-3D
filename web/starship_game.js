@@ -72,6 +72,7 @@ Star.prototype.deckY = function (i) { return D[i].y; };
 Star.prototype.SPACE = function () { return this.g.world === 'space' || this.g.world === 'planet'; };
 Star.prototype.shipVisible = function () { const s = this.ship; return (s.world === 'city' && this.g.world === 'city') || (s.world === this.g.world); };
 
+const CHARGE = 2.2;   // seconds the warp field takes to build
 /* ---------------- per frame ---------------- */
 Star.prototype.update = function (dt, inp) {
   const g = this.g, s = this.ship, f = this.foot(); this.t += dt;
@@ -83,10 +84,14 @@ Star.prototype.update = function (dt, inp) {
     if (s.y > top) { this.toSpace(); this.say('IN ORBITA · ' + KS.DEST[s.loc].name, 4); }
   } else if (s.mode === 'descent') { s.mt += dt; const tgt = s.world === 'city' ? CITY.y : 60; s.y = ease(s.y, tgt, 0.55, dt); s.pitch = ease(s.pitch, 0, 1.5, dt);
     if (Math.abs(s.y - tgt) < 3) { s.mode = null; s.vy = 0; s.landed = s.world === 'planet' ? this.site : null; this.say(s.world === 'city' ? 'SOPRA LE NUVOLE DI CYBERCITY' : 'ATTERRATI · ' + KS.DEST[this.site].name, 4); }
+  } else if (s.mode === 'charge') {
+    // the field builds up: coils light from the back, collectors glow, the hull hums — then the jump
+    s.mt += dt; s.imp = ease(s.imp, 0.3, 1, dt); s.roll = ease(s.roll, 0, 1.5, dt);
+    if (s.mt >= CHARGE) { s.mode = 'warp'; s.travel.t = 0; this.flash = 0.7; if (this.au) this.au.blip(60, 1800, 0.9, 0.4, 'sawtooth'); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) { } }
   } else if (s.mode === 'warp') {
-    const w = KS.WARP_STEPS[s.warpI], c = KS.warpC(w), d = s.travel;
-    d.done += c * 0.0004 * dt; d.t += dt;
-    if (d.done >= d.total || !isFinite(c)) this.arrive();
+    // every trip takes at least a few seconds in curvature (and at most ~a minute): you see the jump, the tunnel, the drop-out
+    const d = s.travel; d.t += dt; d.done = d.total * Math.min(1, d.t / d.dur);
+    if (d.t >= d.dur) this.arrive();
   } else if (f && f.ss === 'helm') {
     // impulse: W/S throttle, A/D yaw, SPACE/X climb/dive (pitch in space), SHIFT = full impulse
     // a 150 m ship has mass: the throttle sets the impulse, the speed follows slowly; turns build up and the hull banks into them
@@ -103,7 +108,9 @@ Star.prototype.update = function (dt, inp) {
     if (s.world === 'space') { const r = Math.hypot(s.x, s.y, s.z); if (r > 5500) { const k = 5500 / r; s.x *= k; s.y *= k; s.z *= k; } }
   } else { s.imp = ease(s.imp, 0, 1, dt); s.roll = ease(s.roll, 0, 1, dt); }
   // warp-field lensing strength: follows the warp factor while in curvature (and a short swell on engage / drop-out)
-  { const tgt = s.mode === 'warp' ? clamp(0.25 + 0.75 * KS.WARP_STEPS[s.warpI] / 10, 0, 1) : 0; this.lensK = ease(this.lensK || 0, tgt, tgt > (this.lensK || 0) ? 1.4 : 2.2, dt); }
+  { const tgt = s.mode === 'warp' ? clamp(0.25 + 0.75 * KS.WARP_STEPS[s.warpI] / 10, 0, 1) : s.mode === 'charge' ? 0.2 * s.mt / CHARGE : 0; this.lensK = ease(this.lensK || 0, tgt, tgt > (this.lensK || 0) ? 1.4 : 2.2, dt); }
+  // warp coils: idle trickle, ramp while charging, full in curvature, a flare at drop-out, then fade
+  { const tg = s.mode === 'warp' ? 1 : s.mode === 'charge' ? 0.15 + 0.85 * Math.pow(s.mt / CHARGE, 1.5) : 0; this.nacK = ease(this.nacK || 0, tg, tg > (this.nacK || 0) ? 3 : 0.8, dt); }
   // the crew on the move
   for (const c of CREW) if (c.path) { c.ph = (c.ph || Math.random() * 10) + dt * (c.dwell ? 0.05 : 0.08); }
   this.wake = this.wake && this.wake.t > 0 ? (this.wake.t -= dt, this.wake) : null; this.repT = Math.max(0, (this.repT || 0) - dt); this.boostT = Math.max(0, (this.boostT || 0) - dt);
@@ -118,18 +125,18 @@ Star.prototype.toSpace = function () {
   s.world = 'space'; s.mode = null; s.x = 0; s.y = 0; s.z = 0; s.vy = 0; s.pitch = 0; s.roll = 0; s.imp = 0.2; s.landed = null; g.world = 'space'; this.flash = 0.8;
 };
 Star.prototype.arrive = function () {
-  const s = this.ship; s.loc = s.travel.to; s.mode = null; s.travel = null; s.x = 0; s.y = 0; s.z = 0; s.pitch = 0; s.imp = 0.1; this.flash = 1.2;
+  const s = this.ship; s.loc = s.travel.to; s.mode = null; s.travel = null; s.course = null; s.x = 0; s.y = 0; s.z = 0; s.pitch = 0; s.imp = 0.1; this.flash = 1.2;
   this.say('USCITA DALLA CURVATURA · ' + KS.DEST[s.loc].name, 5); if (this.au) this.au.blip(900, 120, 0.9, 0.4);
 };
 Star.prototype.engage = function () {
   const s = this.ship;
   if (s.world !== 'space') { this.say('PRIMA DECOLLA: IL WARP SI ATTIVA SOLO NELLO SPAZIO', 4); return; }
   if (!s.course || s.course === s.loc) { this.say('IMPOSTA UNA ROTTA NELL’ASTROLAB O CON «ROTTA»', 4); return; }
-  const total = Math.max(1e-6, KS.dist(s.loc, s.course)), w = KS.WARP_STEPS[s.warpI];
-  s.travel = { to: s.course, total, done: 0, t: 0 }; s.mode = 'warp'; this.flash = 0.6;
+  const total = Math.max(1e-6, KS.dist(s.loc, s.course)), w = KS.WARP_STEPS[s.warpI], c = KS.warpC(w), eta = isFinite(c) ? total / (c * 0.0004) : 0;
+  s.travel = { to: s.course, total, done: 0, t: 0, dur: clamp(eta, w >= 10 ? 3.5 : 6, 60) }; s.mode = 'charge'; s.mt = 0;
   if (w >= 10) { this.say('WARP 10 · VELOCITÀ INFINITA: SEI OVUNQUE NELLO STESSO ISTANTE', 5); }
-  else this.say('WARP ' + w + ' · INGRANA!', 3);
-  if (this.au) this.au.blip(80, 1400, 1.2, 0.35, 'sawtooth');
+  else this.say('CAMPO DI CURVATURA IN CARICA… WARP ' + w, 3);
+  if (this.au) this.au.blip(50, 420, CHARGE, 0.25, 'sawtooth');
 };
 Star.prototype.takeoff = function () {
   const s = this.ship; if (s.mode) return;
@@ -305,7 +312,7 @@ Star.prototype.key = function (code) {
   if (code === 'Minus' || code === 'NumpadSubtract') { s.warpI = Math.max(0, s.warpI - 1); return true; }
   if (code === 'KeyT') { this.takeoff(); return true; } if (code === 'KeyL') { this.land(); return true; }
   if (code === 'KeyJ') { this.engage(); return true; } if (code === 'KeyN') { this.menu('course'); return true; }
-  if (code === 'KeyX' && s.mode === 'warp') { s.mode = null; s.travel = null; this.say('USCITA DALLA CURVATURA · ROTTA INTERROTTA', 3); return true; }
+  if (code === 'KeyX' && (s.mode === 'warp' || s.mode === 'charge')) { s.mode = null; s.travel = null; this.say('USCITA DALLA CURVATURA · ROTTA INTERROTTA', 3); return true; }
   return false;
 };
 
@@ -315,11 +322,12 @@ Star.prototype.buildUI = function () {
   st.textContent = '#stUI{position:fixed;left:50%;transform:translateX(-50%);bottom:8vmin;display:flex;gap:1.2vmin;z-index:20;flex-wrap:wrap;justify-content:center;max-width:80vw}'
     + '#stUI button,#stMenu button{font:bold 2.2vmin monospace;color:#ecfcff;background:rgba(7,11,19,.72);border:2px solid rgba(255,200,90,.8);border-radius:2vmin;padding:1.2vmin 2vmin;cursor:pointer}'
     + '#stUI button.big{font-size:3vmin;border-color:#7ff;box-shadow:0 0 2vmin rgba(120,255,255,.6)} #stUI button.on{background:rgba(255,190,80,.35)}'
-    + '#stMenu{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:rgba(5,8,16,.92);border:2px solid rgba(255,200,90,.8);border-radius:2vmin;padding:2vmin;display:none;max-height:80vh;overflow:auto;min-width:50vmin;color:#ecfcff;font:2vmin monospace}'
+    + '#stMenu{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:rgba(5,8,16,.92);border:2px solid rgba(255,200,90,.8);border-radius:2vmin;padding:2vmin;display:none;max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-width:50vmin;max-width:94vw;box-sizing:border-box;color:#ecfcff;font:2vmin monospace}'
     + '#stMenu .card{display:block;width:100%;text-align:left;margin:.8vmin 0} #stMenu .card small{display:block;font-weight:normal;opacity:.8;margin-top:.4vmin} #stMenu h3{margin:0 0 1vmin;letter-spacing:.2em;color:#ffcf70}';
   document.head.appendChild(st);
   const ui = this.ui = document.createElement('div'); ui.id = 'stUI'; document.body.appendChild(ui);
   const mn = this.mn = document.createElement('div'); mn.id = 'stMenu'; document.body.appendChild(mn);
+  for (const ev of ['touchstart', 'touchmove', 'pointerdown', 'pointermove', 'wheel']) mn.addEventListener(ev, e => e.stopPropagation(), { passive: true });   // the list scrolls; the game doesn't steal the finger
   const B = (id, label, fn, cls) => { const b = document.createElement('button'); b.id = id; b.textContent = label; if (cls) b.className = cls; b.style.display = 'none';
     const go = e => { e.preventDefault(); e.stopPropagation(); fn(); }; b.addEventListener('click', go); b.addEventListener('touchstart', go); ui.appendChild(b); return b; };
   this.btn = {
@@ -333,7 +341,7 @@ Star.prototype.updateUI = function () {
   const foot = f && f.active && !this.g.veh, helm = foot && f.ss === 'helm';
   show(this.btn.beam, foot && this.badge && (!f.ss || f.ss === 'planet'));
   show(this.btn.up, helm && !s.mode && s.world !== 'space'); show(this.btn.down, helm && !s.mode && s.world === 'space');
-  for (const k of ['wm', 'wp', 'nav']) show(this.btn[k], helm && s.mode !== 'warp'); show(this.btn.go, helm && s.world === 'space' && !s.mode); show(this.btn.stop, helm && s.mode === 'warp');
+  const inW = s.mode === 'warp' || s.mode === 'charge'; for (const k of ['wm', 'wp', 'nav']) show(this.btn[k], helm && !inW && s.world === 'space'); show(this.btn.go, helm && s.world === 'space' && !s.mode && !!s.course && s.course !== s.loc); show(this.btn.stop, helm && inW);
   const lab = 'WARP ' + KS.WARP_STEPS[s.warpI]; if (this.btn.go.dataset.l !== lab) { this.btn.go.dataset.l = lab; this.btn.go.textContent = window.tr ? tr('⚡ INGRANA') + ' · ' + lab : '⚡ INGRANA · ' + lab; }
   if (this.mn.style.display !== 'none' && !(f && f.active && (f.ss === 'in' || f.ss === 'helm'))) this.mn.style.display = 'none';
 };
@@ -341,7 +349,7 @@ Star.prototype.menu = function (kind) {
   const mn = this.mn, s = this.ship, f = this.foot(); let h = '';
   if (kind === 'decks') { h = '<h3>ASCENSORE · PONTI</h3>' + D.map((d, i) => '<button class="card" data-deck="' + i + '">' + (i === f.deck ? '▶ ' : '') + d.title + '</button>').join(''); }
   else { h = '<h3>ASTROLAB · CARTIGLI DI NAVIGAZIONE</h3><div style="opacity:.8;margin-bottom:1vmin">Posizione: ' + KS.DEST[s.loc].name + ' · fattore warp ' + KS.WARP_STEPS[s.warpI] + '</div>';
-    for (const k of KS.DEST_ORDER) { const d = KS.DEST[k], dl = KS.dist(s.loc, k), c = KS.warpC(KS.WARP_STEPS[s.warpI]), eta = isFinite(c) ? dl / (c * 0.0004) : 0, real = isFinite(c) ? dl / c * 365.25 : 0;
+    for (const k of KS.DEST_ORDER) { const d = KS.DEST[k], dl = KS.dist(s.loc, k), c = KS.warpC(KS.WARP_STEPS[s.warpI]), eta = isFinite(c) ? clamp(dl / (c * 0.0004), 6, 60) : 3.5, real = isFinite(c) ? dl / c * 365.25 : 0;
       h += '<button class="card" data-dest="' + k + '"' + (k === s.loc ? ' disabled style="opacity:.5"' : '') + '>' + (s.course === k ? '◆ ' : '') + d.name + '<small>' + d.type + ' · ' + fmtLy(dl) + (d.temp ? ' · ' + d.temp : '') + (d.g ? ' · gravità ' + d.g + ' g' : '')
         + (k !== s.loc ? ' · ETA ' + (isFinite(c) ? fmtT(eta) + ' (reale ' + fmtDays(real) + ')' : 'ISTANTANEA') : '') + '</small></button>'; } }
   h += '<button data-close="1" style="margin-top:1vmin">✕ CHIUDI</button>';
@@ -350,7 +358,7 @@ Star.prototype.menu = function (kind) {
       if (d.deck !== undefined) { if (+d.deck !== f.deck) { f.rideT = 1.4; f.rideTo = +d.deck; f.lx = 0; f.lz = KS.LIFT_Z; f.lh = 0; f.lcam = 0; this.syncFoot(f); if (this.au) this.au.blip(220, 140, 1.3, 0.12, 'sine'); } }
       if (d.dest) { s.course = d.dest; this.say('ROTTA IMPOSTATA · ' + KS.DEST[d.dest].name + ' · ' + fmtLy(KS.dist(s.loc, d.dest)), 4); }
       mn.style.display = 'none'; };
-    b.addEventListener('click', go); b.addEventListener('touchstart', go); });
+    b.addEventListener('click', go); });   // click only: a finger that drags scrolls the list instead of choosing
 };
 const fmtLy = ly => ly >= 1 ? ly.toLocaleString('it-IT', { maximumFractionDigits: 2 }) + ' anni luce' : ly > 1e-6 ? (ly * 63241).toLocaleString('it-IT', { maximumFractionDigits: 2 }) + ' UA' : (ly * 9.461e12).toLocaleString('it-IT', { maximumFractionDigits: 0 }) + ' km';
 const fmtT = s => s < 1 ? '<1 s' : s < 120 ? Math.round(s) + ' s' : Math.round(s / 60) + ' min';
@@ -507,7 +515,13 @@ Star.prototype.lens = function (ctx) {
 };
 /** transporter sparkle columns (additive) */
 Star.prototype.drawAdditive = function (ctx) {
-  const g = this.g, gl = this.gl, f = this.foot(); if (!f || !f.active || !f.ss) return;
+  const g = this.g, gl = this.gl, f = this.foot();
+  if ((this.nacK || 0) > 0.02 && this.shipVisible() && g.fleet && !(this.aboard() && (f.ss !== 'helm' || g.view % 2 === 0))) { const P = g.P.veh, u = P.u, k = this.nacK, pulse = 0.85 + 0.15 * Math.sin(ctx.t * (6 + 10 * k));
+    gl.useProgram(P.p); ctx.set(P); gl.uniform1f(u.uTraffic, 0); gl.uniform1f(u.uScale, 1); gl.uniform3f(u.uTint, -1, 0, 0); gl.uniform1f(u.uGlowOnly, 1);
+    const ng = this.mesh('nacGlow', () => KS.buildNacelleGlow(this.cfg())), Ms = this.shipM(ctx);
+    for (let i = 0; i < 2; i++) { if (u.uGlowDim) gl.uniform1f(u.uGlowDim, clamp(1 - k * pulse * (i ? 0.6 : 1), 0, 1)); this.drawM(ng, i ? U.mul(Ms, new Float32Array([1.02, 0, 0, 0, 0, 1.04, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1])) : Ms); }
+    if (u.uGlowDim) gl.uniform1f(u.uGlowDim, 0); gl.uniform1f(u.uGlowOnly, 0); }
+  if (!f || !f.active || !f.ss) return;
   if (f.ss === 'in' && this.shipVisible() && g.fleet) { const d = D[f.deck], P = g.P.veh, u = P.u, Ms = this.shipM(ctx);
     gl.useProgram(P.p); ctx.set(P); gl.uniform1f(u.uTraffic, 0); gl.uniform1f(u.uScale, 1); gl.uniform3f(u.uTint, -1, 0, 0); gl.uniform1f(u.uGlowOnly, 1); gl.uniform1f(u.uLit, 1); gl.uniform1f(u.uRotA, ctx.t * 0.5);
     if (d.id === 'ingegneria') { const pg = this.mesh('podGlow', () => window.KageXeno.buildPodGlow([0.35, 0.7, 1])); KS.STASIS.forEach((q, i) => { if (this.wake && this.wake.i === i) return; this.drawM(pg, U.mul(Ms, U.T(q[0], d.y + 0.32, q[1])), { rot: ctx.t * 0.5 + i }); });
@@ -536,7 +550,8 @@ Star.prototype.drawHud = function (hud) {
       lines.push('KAGE ODYSSEY · PLANCIA · ' + (s.world === 'space' ? 'ORBITA · ' + KS.DEST[s.loc].name : s.world === 'city' ? 'SOPRA CYBERCITY' : 'ATTERRATI · ' + KS.DEST[s.loc].name));
       if (s.mode === 'warp') { const tr2 = s.travel, rem = Math.max(0, tr2.total - tr2.done); lines.push('IN CURVATURA · WARP ' + w + ' (' + (isFinite(c) ? Math.round(c).toLocaleString('it-IT') + ' × c' : '∞') + ') · VERSO ' + KS.DEST[tr2.to].name + ' · MANCANO ' + fmtLy(rem)); }
       else lines.push('IMPULSO ' + Math.round(s.imp * 100) + '% · FATTORE WARP ' + w + (s.course ? ' · ROTTA: ' + KS.DEST[s.course].name + ' (' + fmtLy(KS.dist(s.loc, s.course)) + ')' : ' · nessuna rotta'));
-      lines.push('W/S impulso · A/D virata · SPAZIO/X quota · 1-9 / 0 warp · J ingrana · T decolla · L atterra · N rotta · C vista · INVIO alzati'); }
+      if (s.mode === 'charge') lines[lines.length - 1] = 'CAMPO DI CURVATURA ' + Math.round(100 * s.mt / CHARGE) + '% · WARP ' + w + ' · VERSO ' + KS.DEST[s.travel.to].name;
+      if (!document.body.classList.contains('touch')) lines.push('W/S impulso · A/D virata · SPAZIO/X quota · 1-9 / 0 warp · J ingrana · T decolla · L atterra · N rotta · C vista · INVIO alzati'); }
     if (f.ss === 'eva') lines.push('EVA · tuta spaziale · torna al portello verde per rientrare');
     if (f.ss === 'planet') lines.push(KS.DEST[Object.keys(KS.DEST).find(k => KS.DEST[k].land === this.site)].name + ' · esplora · ✦ BEAM IN per tornare a bordo');
     if (f.ss === 'beamout' || f.ss === 'beamup' || f.ss === 'beamdown') lines.push('TELETRASPORTO IN CORSO…');

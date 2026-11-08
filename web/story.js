@@ -92,7 +92,7 @@ Story.prototype.gates = function () {
   wrap(window.KageNexus, 'dial', function (o, a) { if (!self.can('nexus')) { if (this.near) self.lockSay('nexus'); return; } return o.apply(this, a); });
   wrap(window.KageXenoGame, 'enter', function (o, a) { const f = this.g.foot; if (f && f.inEp && !f.xs && !this.tt && !self.can('epoch')) { self.lockSay('epoch'); return true; } return o.apply(this, a); });
 };
-Story.prototype.unlocks = function (n) { const L = Object.keys(UNLOCK).filter(k => UNLOCK[k] === n); if (L.length && !this.st.free) setTimeout(() => this.toast('🔓 SBLOCCATO · ' + L.map(k => UNAME[k]).join(' · ')), 3600); };
+Story.prototype.unlocks = function (n) { if (n === 6 && !this.st.free) setTimeout(() => this.toast('⏳ NUOVE CRONACHE DEL TEMPO · 📜 Missioni'), 7200); const L = Object.keys(UNLOCK).filter(k => UNLOCK[k] === n); if (L.length && !this.st.free) setTimeout(() => this.toast('🔓 SBLOCCATO · ' + L.map(k => UNAME[k]).join(' · ')), 3600); };
 Story.prototype.save = function () { LS.set('kageStory', JSON.stringify(this.st)); };
 Story.prototype.flag = function (k, v) { if (v !== undefined) { if (!this.st.flags[k]) { this.st.flags[k] = v; this.save(); } } return !!this.st.flags[k]; };
 Story.prototype.cur = function () { return this.C[Math.min(this.st.ch, this.C.length - 1)]; };
@@ -249,11 +249,15 @@ function install(OS) {
       + '<button class="btn" data-act="radio">📡 riascolta VEGA</button> <button class="btn" data-act="storyreset">↺ nuova partita (dal prologo)</button> <button class="btn ' + (st.free ? 'on' : '') + '" data-act="storyfree">' + (st.free ? '🔓 modalità libera: tutto sbloccato' : '🔒 sblocco con la storia') + '</button></div>'
       + Sg.C.map((c, i) => { const cur = i === st.ch, past = i < st.ch; if (i > st.ch) return '<div class="card" style="opacity:.45"><b>' + c.title + '</b><br><small>bloccato</small></div>';
         return '<div class="card ' + (cur ? 'n' : '') + '"><b>' + (past ? '✔ ' : '◆ ') + c.title + '</b>' + c.obj.map(o => '<div style="margin-top:.5vmin">' + (st.done[o.id] ? '☑' : '☐') + ' ' + o.t + '</div>').join('') + '</div>'; }).join('')
+      + (window.KageChron && Sg.cuts ? (() => { const CH = KageChron, ok = CH.unlocked(Sg), dn = CH.done(); return '<div class="card"><b>⏳ Cronache del tempo</b><br><small>' + (ok ? 'Viaggi con l’EPOCH in altre epoche. Ogni cronaca lascia un ricordo.' : '🔒 si sbloccano con l’EPOCH (capitolo VII)') + '</small><br>'
+        + CH.EPIS.map(e => '<button class="btn" data-act="chron" data-id="' + e.id + '"' + (ok ? '' : ' disabled style="opacity:.4"') + '>' + (dn.includes(e.id) ? '✔ ' : e.ic + ' ') + e.title + '</button> ').join('')
+        + (dn.length ? '<div style="margin-top:.6vmin">Ricordi: ' + CH.EPIS.filter(e => dn.includes(e.id)).map(e => e.reward).join(' · ') + '</div>' : '') + '</div>'; })() : '')
       + (Sg.cuts ? '<div class="card"><b>🎬 Scene della storia</b><br>' + (Sg.st.prologue ? '<button class="btn" data-act="cut" data-id="prologo">▶ IL RISVEGLIO</button> ' : '') + Sg.cuts.list().map(x => (Sg.cuts.seen().includes(x.id) || st.free || st.ch >= x.at) ? '<button class="btn" data-act="cut" data-id="' + x.id + '">▶ ' + x.title + '</button> ' : '<button class="btn" disabled style="opacity:.4">🔒 ' + x.title + '</button> ').join('') + '</div>' : ''));
   };
   const act0 = OS.prototype.act;
   OS.prototype.act = function (a, el) { const Sg = this.g.story;
     if (a === 'radio' && Sg) { this.close(); setTimeout(() => Sg.finished() ? Sg.radio(EPILOGUE, 'EPILOGO') : Sg.radio(), 3000); return; }
+    if (a === 'chron' && Sg && el && window.KageChron) { const id = el.dataset.id; this.close(); setTimeout(() => KageChron.play(Sg.cuts, id, Sg), 2600); return; }
     if (a === 'cut' && Sg && el) { const id = el.dataset.id; this.close(); setTimeout(() => { if (id === 'prologo') { if (Sg.pro) Sg.pro.replay ? Sg.pro.replay() : Sg.pro.start(); } else if (Sg.cuts) Sg.cuts.play(id); }, 2600); return; }
     if (a === 'storyfree' && Sg) { Sg.st.free = !Sg.st.free; Sg.save(); this.launch('story'); return; }
     if (a === 'storyreset' && Sg) { if (this.confirmReset) { this.confirmReset = false; this.close(); setTimeout(() => Sg.reset(), 3000); } else { this.confirmReset = true; this.toast('Tocca di nuovo per ricominciare da capo'); setTimeout(() => { this.confirmReset = false; }, 3000); } return; }

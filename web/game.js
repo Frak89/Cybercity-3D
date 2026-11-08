@@ -707,7 +707,7 @@ Game.prototype.frame = function (dt, inp) {
   if (sp.u.uCloud) gl.uniform1f(sp.u.uCloud, past ? 0.45 : wx ? wx.cloud : 0);
   if (sp.u.uDay) gl.uniform1f(sp.u.uDay, this.dayK);
   gl.uniform3fv(sp.u.uSunDir, pal.sunDir); gl.uniform3fv(sp.u.uSunCol, pal.sun); gl.uniform1f(sp.u.uSunStripes, pal.stripes);
-  if (!UNDER) this.draw(sp, this.M.quad);
+  if (!UNDER && this.world !== 'space') this.draw(sp, this.M.quad);   // deep space: black, the stars come from the ODYSSEY's starfield
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
   if (past) {
     const g = P.meadow; gl.useProgram(g.p); set(g); gl.uniform3fv(g.u.uSunDir, pal.sunDir); gl.uniform3fv(g.u.uSunCol, pal.sun); this.draw(g, this.M.ground);
@@ -789,7 +789,7 @@ Game.prototype.frame = function (dt, inp) {
     gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
   }
   if (!past && !SPACE) { gl.useProgram(P.car.p); set(P.car); gl.uniform1f(P.car.u.uWidth, 0.3); this.draw(P.car, this.M.car); }
-  if (!VEH) {
+  if (!VEH && !SPACE) {   // the GT's lamps stay with the GT (in space they floated in the sky as two teal blobs)
   gl.useProgram(P.glow.p); set(P.glow);
   gl.uniformMatrix4fv(P.glow.u.uModel, false, model(c.h, carRel[0], 0, carRel[2]));
   gl.uniform1f(P.glow.u.uGlow, 0.55 + 0.15 * Math.sin(t * 3)); this.draw(P.glow, this.CM.under);
@@ -805,7 +805,7 @@ Game.prototype.frame = function (dt, inp) {
   if (this.star && P.lens && !(this.power && !this.power.cfg().lens)) { const li = this.star.lens({ camX, camZ }); if (li) {
     let cx = 0.5, cy = 0.47, R = 0.3, k = li.k * 0.3;
     if (!li.inside) { const v = [li.p[0], li.p[1], li.p[2], 1], q = [0, 0, 0, 0]; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) q[i] += VP[j * 4 + i] * v[j];
-      if (q[3] > 1) { cx = 0.5 + 0.5 * q[0] / q[3]; cy = 0.5 + 0.5 * q[1] / q[3]; R = Math.min(0.9, li.r * Pm[5] / q[3] * 0.5); k = li.k; } }
+      if (q[3] > 1) { cx = 0.5 + 0.5 * q[0] / q[3]; cy = 0.5 + 0.5 * q[1] / q[3]; R = li.r * Pm[5] / q[3] * 0.5; k = li.k * (R > 0.38 ? 0.38 / R : 1); R = Math.min(0.38, R); } }
     if (!this.lensTex || this.lensW !== W || this.lensH !== H) { if (this.lensTex) gl.deleteTexture(this.lensTex); this.lensTex = gl.createTexture(); this.lensW = W; this.lensH = H; gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, W, H, 0, gl.RGB, gl.UNSIGNED_BYTE, null); }
